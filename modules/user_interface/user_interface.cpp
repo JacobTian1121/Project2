@@ -14,10 +14,12 @@
 #include "gas_sensor.h"
 #include "matrix_keypad.h"
 #include "display.h"
+#include "servo.h"
 
 //=====[Declaration of private defines]========================================
 
 #define DISPLAY_REFRESH_TIME_MS 1000
+
 
 //=====[Declaration of private data types]=====================================
 
@@ -97,6 +99,7 @@ void userInterfaceCodeCompleteWrite( bool state )
     codeComplete = state;
 }
 
+
 //=====[Implementations of private functions]==================================
 
 static void userInterfaceMatrixKeypadUpdate()
@@ -106,15 +109,39 @@ static void userInterfaceMatrixKeypadUpdate()
 
     if( keyReleased != '\0' ) {
 
-        if( sirenStateRead() && !systemBlockedStateRead() ) {
+        if(!systemBlockedStateRead() ) {
             if( !incorrectCodeStateRead() ) {
                 codeSequenceFromUserInterface[numberOfCodeChars] = keyReleased;
                 numberOfCodeChars++;
+                clearScreen();
+                displayCharPositionWrite(0,0);
+                displayStringWrite("Code:");
+                displayCharPositionWrite(6,0);
+                displayStringWrite(codeSequenceFromUserInterface);
+
                 if ( numberOfCodeChars >= CODE_NUMBER_OF_KEYS ) {
                     codeComplete = true;
+                    clearScreen();
+                    codeMatchFrom(CODE_KEYPAD);
                     numberOfCodeChars = 0;
+
                 }
-            } else {
+            }else{
+                codeSequenceFromUserInterface[numberOfCodeChars] = keyReleased;
+                numberOfCodeChars++;
+                clearScreen();
+                displayCharPositionWrite(0,0);
+                displayStringWrite("Code:");
+                displayCharPositionWrite(6,0);
+                displayStringWrite(codeSequenceFromUserInterface);
+                
+                if ( numberOfCodeChars >= CODE_NUMBER_OF_KEYS ) {
+                codeComplete = true;
+                numberOfCodeChars = 0;
+                clearScreen();
+                codeMatchFrom(CODE_KEYPAD);
+            } }}
+        else {
                 if( keyReleased == '#' ) {
                     numberOfHashKeyReleased++;
                     if( numberOfHashKeyReleased >= 2 ) {
@@ -127,53 +154,57 @@ static void userInterfaceMatrixKeypadUpdate()
             }
         }
     }
-}
 
 static void userInterfaceDisplayInit()
 {
-    displayInit( DISPLAY_CONNECTION_GPIO_4BITS );
+    displayInit();
      
     displayCharPositionWrite ( 0,0 );
-    displayStringWrite( "Temperature:" );
+    displayStringWrite( "Welcome" );
 
-    displayCharPositionWrite ( 0,1 );
-    displayStringWrite( "Gas:" );
+    displayCharPositionWrite ( 8,0 );
+    displayStringWrite( "Back" );
     
-    displayCharPositionWrite ( 0,2 );
-    displayStringWrite( "Alarm:" );
+    displayCharPositionWrite ( 0,1 );
+    displayStringWrite( "Code Please" );
 }
 
 static void userInterfaceDisplayUpdate()
 {
     static int accumulatedDisplayTime = 0;
     char temperatureString[3] = "";
+    static int accumulatedMotiontime = 0;
+
+    if(servoMotionRead()){
+        accumulatedMotiontime = accumulatedMotiontime + SYSTEM_TIME_INCREMENT_MS;
+        if (accumulatedMotiontime >= 2000){
+            servoMotionClose();
+            accumulatedMotiontime = 0;
+        }
+
+    }
     
     if( accumulatedDisplayTime >=
         DISPLAY_REFRESH_TIME_MS ) {
 
         accumulatedDisplayTime = 0;
 
-        sprintf(temperatureString, "%.0f", temperatureSensorReadCelsius());
-        displayCharPositionWrite ( 12,0 );
-        displayStringWrite( temperatureString );
-        displayCharPositionWrite ( 14,0 );
-        displayStringWrite( "'C" );
 
         displayCharPositionWrite ( 4,1 );
 
-        if ( gasDetectorStateRead() ) {
-            displayStringWrite( "Detected    " );
-        } else {
-            displayStringWrite( "Not Detected" );
-        }
+        //if ( gasDetectorStateRead() ) {
+            //displayStringWrite( "Detected    " );
+       // } else {
+            //displayStringWrite( "Not Detected" );
+        //}
 
-        displayCharPositionWrite ( 6,2 );
+        //displayCharPositionWrite ( 6,2 );
         
-        if ( sirenStateRead() ) {
-            displayStringWrite( "ON " );
-        } else {
-            displayStringWrite( "OFF" );
-        }
+        //if ( sirenStateRead() ) {
+            //displayStringWrite( "ON " );
+        //} else {
+            //displayStringWrite( "OFF" );
+        //}
 
     } else {
         accumulatedDisplayTime =
