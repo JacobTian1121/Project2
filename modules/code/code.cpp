@@ -11,9 +11,11 @@
 #include "temperature_sensor.h"
 #include "gas_sensor.h"
 #include "matrix_keypad.h"
+#include "servo.h"
+#include "user_interface.h"
+#include "display.h"
 
 //=====[Declaration of private defines]========================================
-
 //=====[Declaration of private data types]=====================================
 
 //=====[Declaration and initialization of public global objects]===============
@@ -27,10 +29,12 @@ extern char codeSequenceFromPcSerialCom[CODE_NUMBER_OF_KEYS];
 
 static int numberOfIncorrectCodes = 0;
 static char codeSequence[CODE_NUMBER_OF_KEYS] = { '1', '8', '0', '5' };
+static char GatecodeSequence[CODE_NUMBER_OF_KEYS] = { '1', '1', '2', '1' };
 
 //=====[Declarations (prototypes) of private functions]========================
 
 static bool codeMatch( char* codeToCompare );
+static bool GatecodeMatch( char* codeToCompare );
 static void codeDeactivate();
 
 //=====[Implementations of public functions]===================================
@@ -46,16 +50,38 @@ void codeWrite( char* newCodeSequence )
 bool codeMatchFrom( codeOrigin_t codeOrigin )
 {
     bool codeIsCorrect = false;
+    bool GatecodeIsCorrect = false;
+    static int Remaintime = 3;
+    char time[2] = " ";
+
     switch (codeOrigin) {
         case CODE_KEYPAD:
             if( userInterfaceCodeCompleteRead() ) {
-                codeIsCorrect = codeMatch(codeSequenceFromUserInterface);
+                GatecodeIsCorrect = GatecodeMatch(codeSequenceFromUserInterface);
                 userInterfaceCodeCompleteWrite(false);
-                if ( codeIsCorrect ) {
-                    codeDeactivate();
+                if ( GatecodeIsCorrect ) {
+                    displayCharPositionWrite(0,0);
+                    displayStringWrite("Code correct");
+                    servoMotionOpen();
+                    delay(2000);
+                    Remaintime = 3;
+                    userInterfaceInit();
+
                 } else {
+                    displayCharPositionWrite(0,0);
+                    displayStringWrite("Code incorrect");
                     incorrectCodeStateWrite(ON);
                     numberOfIncorrectCodes++;
+                    delay(2000);
+                    clearScreen();
+                    displayCharPositionWrite(0,0);
+                    displayStringWrite("Try again");
+                    displayCharPositionWrite(0,1);
+                    displayStringWrite("Remain time:");
+                    displayCharPositionWrite(13,1);
+                    sprintf(time,"%d",Remaintime);
+                    displayStringWrite(time);
+                    Remaintime = Remaintime - 1;
                 }
             }
 
@@ -80,11 +106,18 @@ bool codeMatchFrom( codeOrigin_t codeOrigin )
         break;
     }
 
-    if ( numberOfIncorrectCodes >= 5 ) {
+    if ( numberOfIncorrectCodes >= 4 ) {
         systemBlockedStateWrite(ON);
-    }
+        clearScreen();
+        displayCharPositionWrite(0,0);
+        displayStringWrite("System");
+        displayCharPositionWrite(0,1);
+        displayStringWrite("Blocked");
+        }
+
 
     return codeIsCorrect;
+    return GatecodeIsCorrect;
 }
 
 //=====[Implementations of private functions]==================================
@@ -99,7 +132,16 @@ static bool codeMatch( char* codeToCompare )
     }
     return true;
 }
-
+static bool GatecodeMatch( char* codeToCompare )
+{
+    int i;
+    for (i = 0; i < CODE_NUMBER_OF_KEYS; i++) {
+        if ( GatecodeSequence[i] != codeToCompare[i] ) {
+            return false;
+        }
+    }
+    return true;
+}
 static void codeDeactivate()
 {
     systemBlockedStateWrite(OFF);
